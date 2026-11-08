@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: docqa-rag-api
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-mock}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.openai.com/v1}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - SIMILARITY_THRESHOLD=${SIMILARITY_THRESHOLD:-0.65}
+      - CHUNK_SIZE=${CHUNK_SIZE:-800}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-150}
+      - DEFAULT_TOP_K=${DEFAULT_TOP_K:-4}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - chroma_data:/app/chroma_db
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  ui:
+    build: .
+    container_name: docqa-rag-ui
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    command: streamlit run ui/streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+
+volumes:
+  chroma_data:
+    driver: local
+
